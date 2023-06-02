@@ -1,3 +1,4 @@
+
 /* A skeleton of this file was written by Duncan Levear in Spring 2023 for CS3333 at Boston College */
 
 export class SVGRenderer {
@@ -38,7 +39,12 @@ export class SVGRenderer {
         this.image.data[index + 3] = 255;
     }
 
+    // Sources...
+    // For path help: https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/d, https://www.youtube.com/watch?v=aVwxzDHniEw, https://www.w3.org/TR/SVG/paths.html
+    // For circle help: https://codepen.io/sdvg/pen/bGweeM, https://en.wikipedia.org/wiki/Midpoint_circle_algorithm
+    // path 
     path(e) {
+        // lookahead assertion: http://rexegg.com/regex-lookarounds.html
         const pathCommands = e.d.split(/(?=[LMQ])/);
         let currentPoint = [0, 0];
         let lastControlPoint = null;
@@ -52,13 +58,14 @@ export class SVGRenderer {
               currentPoint = [args[0], args[1]];
               break;
             }
+            //line to
             case 'L': {
-                const endPoint = [args[0], args[1]];
-                this.drawLine(currentPoint[0], currentPoint[1], endPoint[0], endPoint[1], parseRGB(e.stroke), e['stroke-opacity'] || 1, e.strokeWidth);
-                currentPoint = endPoint; // update current point to be the same as end point
-                break;
+              const endPoint = [args[0], args[1]];
+              this.drawLine(currentPoint[0], currentPoint[1], endPoint[0], endPoint[1], parseRGB(e.stroke), e['stroke-opacity'] || 1, e.strokeWidth);
+              currentPoint = endPoint;
+              break;
             }
-
+            // quadratic curves
             case 'Q': {
               const controlPoint = [args[0], args[1]];
               const endPoint = [args[2], args[3]];
@@ -68,9 +75,11 @@ export class SVGRenderer {
               break;
             }
             case 'T': {
+                //abs coordinates
                 const endPoint = [args[0], args[1]];
                 let controlPoint;
                 if (lastControlPoint) {
+
                   // Reflect the previous control point across the current point to get the new control point
                   const dx = currentPoint[0] - lastControlPoint[0];
                   const dy = currentPoint[1] - lastControlPoint[1];
@@ -99,92 +108,126 @@ export class SVGRenderer {
     }
 
     drawQuadraticBezierCurve(x0, y0, x1, y1, x2, y2, color, alpha, strokeWidth = 1) {
-        const t_step = 0.001; // Step size for t, smaller means more precision
+        const t_step = 0.001; // Step size for t, smaller value makes it more smooth
         let prev_x = x0;
         let prev_y = y0;
         for (let t = t_step; t <= 1; t += t_step) {
+            
           // Calculate the x and y coordinates at this value of t
           const x = (1 - t) ** 2 * x0 + 2 * (1 - t) * t * x1 + t ** 2 * x2;
           const y = (1 - t) ** 2 * y0 + 2 * (1 - t) * t * y1 + t ** 2 * y2;
+
           // Draw a line from the previous point to this point
           this.drawLine(Math.round(prev_x), Math.round(prev_y), Math.round(x), Math.round(y), color, alpha, strokeWidth);
           prev_x = x;
           prev_y = y;
         }
+        // Draw the final line segment from the last point to the end point
+        this.drawLine(Math.round(prev_x), Math.round(prev_y), Math.round(x2), Math.round(y2), color, alpha, strokeWidth);
     }
 
-
     circle(e) {
-        // Parse the x, y and radius properties of the circle element
+        // Get the x, y, and radius properties of the circle element
         const cx = parseFloat(e.cx);
         const cy = parseFloat(e.cy);
         const r = parseFloat(e.r);
       
-        // Parse the fill color of the circle element and convert it to RGB format
-        const color_a = parseRGB(e.fill);
+        // Determine whether the circle should be filled or not, or if its just stroke
+        const shouldFill = e.fill !== "none";
+        const shouldStroke = e.stroke && e.stroke !== "none";
       
-        // Parse the fill opacity of the circle element, if it exists
-        let fill_opacity = 1;
-        if (e.fill_opacity) {
-          fill_opacity = parseFloat(e.fill_opacity);
-        }
-      
-        // Parse the stroke opacity of the circle element, if it exists
-        let stroke_opacity = 1;
-        if (e.stroke_opacity) {
-          stroke_opacity = parseFloat(e.stroke_opacity);
-        }
-      
-        // Initialize variables for the circle drawing algorithm
-        let x = r - 1;
-        let y = 0;
-        let dx = 1;
-        let dy = 1;
-        let err = dx - (r * 2);
-      
-        // Loop through each pixel of the circle and blend the color onto the canvas
-        while (x >= y) {
+        // Render the circle fill if the fill value is not "none"
+        if (shouldFill) {
 
-            for (let i = cy - y; i <= cy + y; i++) {
-                this.blendPixel(i, cx + x, color_a[0], color_a[1], color_a[2], fill_opacity);
-                this.blendPixel(i, cx - x, color_a[0], color_a[1], color_a[2], fill_opacity);
-            }
-
-            for (let i = cy - x; i <= cy + x; i++) {
-                this.blendPixel(i, cx + y, color_a[0], color_a[1], color_a[2], fill_opacity);
-                this.blendPixel(i, cx - y, color_a[0], color_a[1], color_a[2], fill_opacity);
+            // Parse the fill color of the circle element and convert it to RGB using parseRGB
+            const fill_color = parseRGB(e.fill);
+      
+            // Parse the fill opacity of the circle element, if it exists
+            let fill_opacity = 1;
+            if (e.fill_opacity) {
+                fill_opacity = parseFloat(e.fill_opacity);
             }
       
-            // Increment or decrement x and y based on the circle drawing algorithm
-            if (err <= 0) {
-                y++;
-                err += dy;
-                dy += 2;
+            // Initialize variables for the circle drawing algorithm
+            let x = r - 1;
+            let y = 0;
+            let dx = 1;
+            let dy = 1;
+            let err = dx - (r * 2);
+      
+          // Loop through each pixel of the circle and blend the color onto the canvas
+            while (x >= y) {
+
+                for (let i = cy - y; i <= cy + y; i++) {
+                    this.blendPixel(i, cx + x, fill_color[0], fill_color[1], fill_color[2], fill_opacity);
+                    this.blendPixel(i, cx - x, fill_color[0], fill_color[1], fill_color[2], fill_opacity);
+                }
+      
+                for (let i = cy - x; i <= cy + x; i++) {
+                    this.blendPixel(i, cx + y, fill_color[0], fill_color[1], fill_color[2], fill_opacity);
+                    this.blendPixel(i, cx - y, fill_color[0], fill_color[1], fill_color[2], fill_opacity);
+                }
+      
+                // Increment or decrement x and y based on the circle drawing algorithm
+                if (err <= 0) {
+                    y++;
+                    err += dy;
+                    dy += 2;
+                }
+      
+                if (err > 0) {
+                    x--;
+                    dx += 2;
+                    err += dx - (r * 2);
+                }
+            }
+        }
+      
+        // Render the <stroke> aspects
+        if (shouldStroke) {
+
+            // Get the stroke's color
+            const stroke_color = parseRGB(e.stroke);
+        
+            // Feed in stroke opacity
+            let stroke_opacity = 1;
+            if (e.stroke_opacity) {
+                stroke_opacity = parseFloat(e.stroke_opacity);
             }
         
-            if (err > 0) {
-                x--;
-                dx += 2;
-                err += dx - (r * 2);
-            }
-        }
-      
-        // If the circle has a stroke, draw the stroke onto the canvas
-        if (e.stroke) {
-            const stroke_color = parseRGB(e.stroke);
-      
-            // Loop through each degree of the circle and draw a line from the outer edge to the center
-            for (let i = 0; i < 360; i += 0.5) {
+            // Draw the stroke using the midpoint circle algorithm again, but only with stroke color
+            let x = r - 1;
+            let y = 0;
+            let dx = 1;
+            let dy = 1;
+            let err = dx - (r * 2);
 
-                const x = cx + r * Math.cos(i * Math.PI / 180);
-                const y = cy + r * Math.sin(i * Math.PI / 180);
-                const [y0, x0] = this.closestPixelTo(x, y);
-                const [y1, x1] = this.closestPixelTo(cx, cy);
-                this.drawLine(x0, y0, x1, y1, stroke_color, stroke_opacity);
+            // calls to blendPixel
+            while (x >= y) {
+                this.blendPixel(cy + y, cx + x, stroke_color[0], stroke_color[1], stroke_color[2], stroke_opacity);
+                this.blendPixel(cy + x, cx + y, stroke_color[0], stroke_color[1], stroke_color[2], stroke_opacity);
+                this.blendPixel(cy - y, cx + x, stroke_color[0], stroke_color[1], stroke_color[2], stroke_opacity);
+                this.blendPixel(cy - x, cx + y, stroke_color[0], stroke_color[1], stroke_color[2], stroke_opacity);
+                this.blendPixel(cy + y, cx - x, stroke_color[0], stroke_color[1], stroke_color[2], stroke_opacity);
+                this.blendPixel(cy + x, cx - y, stroke_color[0], stroke_color[1], stroke_color[2], stroke_opacity);
+                this.blendPixel(cy - y, cx - x, stroke_color[0], stroke_color[1], stroke_color[2], stroke_opacity);
+                this.blendPixel(cy - x, cx - y, stroke_color[0], stroke_color[1], stroke_color[2], stroke_opacity);
+                
+                if (err <= 0) {
+                    y++;
+                    err += dy;
+                    dy += 2;
+                }
+                
+                if (err > 0) {
+                    x--;
+                    dx += 2;
+                    err += dx - (r * 2);
+                }
             }
         }
     }
-
+      
     polygon(e) {
 
         const points = parsePoints(e.points);
@@ -296,10 +339,10 @@ export class SVGRenderer {
         const [minX, minY, globalWidth, globalHeight] = this.scene.viewBox.split(" ").map(Number);
         const colWidth = (this.scene.width - 1) / globalWidth;
         const rowHeight = (this.scene.height - 1) / globalHeight;
-      
-        const pixelX = (y * rowHeight) - (minY * rowHeight);
-        const pixelY = (x * colWidth) - (minX * colWidth);
-      
+
+        const pixelX = Math.round((y * rowHeight) - (minY * rowHeight));
+        const pixelY = Math.round((x * colWidth) - (minX * colWidth));
+
         return [pixelX, pixelY];
     }
 
@@ -318,55 +361,63 @@ export class SVGRenderer {
         return values;
     }
 
-
+    // Core task that needed fixing, mark when done: DONE!!
+    // got help from a classmate on this one, my original drawLine was ok, but it was missing a line for the wire bunny
     drawLine(x0, y0, x1, y1, color, alpha = 1) { 
+
+        // if alpha is undefined
         if (typeof(alpha) == "undefined") {
-            alpha = 1
+            alpha = 1;
         }
 
-        const new_first = this.closestPixelTo(x0,y0)
-        y0 = new_first[0]
-        x0 = new_first[1]
-        const new_second = this.closestPixelTo(x1,y1)
-        y1 = new_second[0]
-        x1 = new_second[1]
+        // make color into separate rgb vals
+        var [r,g,b] = (color);
+
+        // make line end points to the closest pixel
+        const arr1 = this.closestPixelTo(x0, y0);
+        const arr2 = this.closestPixelTo(x1, y1);
+
+        y0 = arr1[0];
+        x0 = arr1[1];
+        y1 = arr2[0];
+        x1 = arr2[1];
         
-        var [r,g,b] = (color)
   
         if (Math.abs(x1 - x0) > Math.abs(y1 - y0)) {
-            // Line is horizontal-ish
-            // Make sure x0 < x1
+            // If the major axis is x, make sure x0 is always less than x1
             if (x0 > x1) {
-                const old_x0 = x0
-                const old_y0 = y0
-                x0 = x1
-                x1 = old_x0
-                y0 = y1
-                y1 = old_y0
+                const temp_x0 = x0;
+                const temp_y0 = y0;
+                x0 = x1;
+                x1 = temp_x0;
+                y0 = y1;
+                y1 = temp_y0;
               
             }
+            // lerp call 1
+            var lerp1 = this.lerp(x0, y0, x1, y1);
 
-            var ys = this.lerp(x0, y0, x1, y1)
-            for (var i = 0; i < ys.length; i++) {
-                this.blendPixel(Math.round((ys[i])), Math.round(x0+i), r, g, b, alpha)
-            }
-            
+            // iterate over lerp array and blend into the canvas
+            for (let i = 0; i < lerp1.length; i++) {
+                this.blendPixel(Math.round((lerp1[i])), Math.round(x0 + i), r, g, b, alpha);
+            }  
+
         } else {
-            // Line is vertical-ish
-            // Make sure y0 < y1
+            // If the major axis is y, make sure y0 is always less than y1
             if (y0 > y1) {
-                const old_x0 = x0
-                const old_y0 = y0
-                x0 = x1
-                x1 = old_x0
-                y0 = y1
-                y1 = old_y0
+                const temp_x0 = x0;
+                const temp_y0 = y0;
+                x0 = x1;
+                x1 = temp_x0;
+                y0 = y1;
+                y1 = temp_y0;
             }
+            // lerp call 2
+            var lerp2 = this.lerp(y0, x0, y1, x1);
 
-            var xs = this.lerp(y0, x0, y1, x1)
-
-            for (var i = 0; i < xs.length; i++) {
-                this.blendPixel(Math.round(y0+i), Math.round(xs[i]), r,g,b, alpha )
+            // iterate over lerp array and blend into the canvas
+            for (let i = 0; i < lerp2.length; i++) {
+                this.blendPixel(Math.round(y0 + i), Math.round(lerp2[i]), r, g, b, alpha);
             }
         }
     }
@@ -416,6 +467,7 @@ export class SVGRenderer {
                 this.circle(e);
 
             } else if (e.type === 'path') {
+                console.log("rendering path commands");
                 this.path(e);
             }
         }
@@ -501,12 +553,3 @@ function parsePoints(points) {
     }
     return ret;
 }
-
-
-
-
-
-
-
-        
-
